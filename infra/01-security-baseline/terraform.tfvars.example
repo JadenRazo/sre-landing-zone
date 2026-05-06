@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+# Email that receives Budgets alerts and (eventually) Security Hub findings.
+# AFTER FIRST APPLY: AWS sends a confirmation email — you must click the link
+# or no alerts will reach you.
+alert_email = "jadenscottrazo@gmail.com"
+
+# Defaults are fine for the rest:
+# home_region                            = "us-west-2"
+# owner_tag                              = "jadenrazo"
+# budget_thresholds_usd                  = [20, 50, 80, 100]
+# config_recording_frequency             = "DAILY"        # CONTINUOUS = ~3-5x cost
+# guardduty_finding_publishing_frequency = "SIX_HOURS"    # FIFTEEN_MINUTES for active investigations

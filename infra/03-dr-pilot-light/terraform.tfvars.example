@@ -1,0 +1,9 @@
+# Defaults are fine for first apply.
+# primary_region        = "us-west-2"
+# dr_region             = "us-east-1"
+# dr_vpc_cidr           = "10.20.0.0/16"
+# ecr_repo_name         = "sre-reference-app"
+# container_image_tag   = "latest"
+# container_port        = 80
+# task_cpu              = 256
+# task_memory           = 512

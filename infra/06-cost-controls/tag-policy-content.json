@@ -1,0 +1,27 @@
+{
+  "tags": {
+    "Environment": {
+      "tag_key": {
+        "@@assign": "Environment"
+      },
+      "tag_value": {
+        "@@assign": ["dev", "prod", "shared", "sandbox"]
+      }
+    },
+    "Owner": {
+      "tag_key": {
+        "@@assign": "Owner"
+      }
+    },
+    "CostCenter": {
+      "tag_key": {
+        "@@assign": "CostCenter"
+      }
+    },
+    "Project": {
+      "tag_key": {
+        "@@assign": "Project"
+      }
+    }
+  }
+}

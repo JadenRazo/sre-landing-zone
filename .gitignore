@@ -1,0 +1,34 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/*.tfvars
+!**/*.tfvars.example
+**/*.tfplan
+**/.terraform.tfstate.lock.info
+**/crash.log
+**/crash.*.log
+
+# AWS
+.aws/
+*.pem
+credentials
+
+# Environment
+.env
+.env.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+*.zip
+
+# Cost snapshot outputs (regenerated)
+docs/cost-snapshots/*.json

@@ -1,0 +1,9 @@
+alert_email = "jadenscottrazo@gmail.com"
+
+# Defaults are fine for the rest:
+# home_region            = "us-west-2"
+# owner_tag              = "jadenrazo"
+# auto_stop_cron         = "cron(0 4 * * ? *)"   # 8 PM PST = 04:00 UTC
+# auto_stop_cluster_name = "sre-workloads-dev"
+# auto_stop_service_name = "sre-reference-app"
+# anomaly_threshold_usd  = 5

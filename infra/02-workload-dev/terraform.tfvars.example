@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and customize. terraform.tfvars is gitignored.
+
+# Defaults are fine for first apply (uses public nginx as placeholder image):
+# home_region          = "us-west-2"
+# vpc_cidr             = "10.0.0.0/16"
+# az_count             = 2
+# container_image      = "public.ecr.aws/nginx/nginx:latest"
+# container_port       = 80
+# task_cpu             = 256
+# task_memory          = 512
+# service_desired_count = 1
+# error_rate           = 0.05
+# log_retention_days   = 30
+
+# When you swap to the real sre-reference-app image:
+# container_image = "422783588447.dkr.ecr.us-west-2.amazonaws.com/sre-reference-app:latest"
+# container_port  = 8080

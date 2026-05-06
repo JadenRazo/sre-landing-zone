@@ -1,0 +1,5 @@
+# Defaults are fine for first apply.
+# home_region            = "us-west-2"
+# rate_limit_per_5min    = 1000
+# geo_allowed_countries  = ["US", "CA", "MX", "GB"]
+# cognito_callback_urls  = ["https://example.com/callback"]

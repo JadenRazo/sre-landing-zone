@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+# Gmail's '+' aliasing means jadenscottrazo+aws-log-archive@gmail.com routes
+# to jadenscottrazo@gmail.com but counts as a unique address for AWS account
+# creation. No domain purchase needed.
+
+email_prefix = "jadenscottrazo"
+email_domain = "gmail.com"
+owner_tag    = "jadenrazo"
+
+# home_region        = "us-west-2"   # default
+# secondary_region   = "us-east-1"   # default
+# approved_regions   = ["us-west-2", "us-east-1"]   # default
+
+# Toggle to true on the SECOND apply, after enabling Identity Center in the console.
+# enable_identity_center_resources = false
