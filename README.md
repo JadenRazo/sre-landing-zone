@@ -16,7 +16,8 @@ Built as the hands-on portfolio for **AWS SAA-C03**, also serves as conceptual p
 | 3 | DR — Pilot Light to us-east-1 | **applied** — DR ALB + ECS @ 0 + ECR replication + DynamoDB Global Table + Route 53 health checks |
 | 4 | Edge, data, and identity | **applied** — CloudFront `d27jg5do0x332j.cloudfront.net` + WAF (3 rules) + Cognito |
 | 5 | Migration write-up + visual artifacts | **complete** — 7 diagrams, 6 R's analysis, blog post, failover drill writeup |
-| 6 | Cost discipline & auto-teardown | **applied** — Lambda auto-stop + EventBridge + Cost Anomaly + Tag Policy |
+| 6 | Cost discipline & auto-teardown | **applied** — tag-based Lambda auto-stop + EventBridge + Cost Anomaly + Tag Policy |
+| 7 | CI/CD — GitHub Actions OIDC | **applied** — OIDC provider + runner role + plan/apply/nightly-teardown workflows |
 
 ---
 
@@ -52,7 +53,19 @@ CloudFront in front of the ALB with WAF (CommonRuleSet, KnownBadInputs, custom r
 
 ![Cost Controls](docs/architecture-cost-controls.png)
 
-EventBridge cron @ 8 PM PST → Lambda in mgmt → assumes minimal-permission `AutoStopExecutorRole` in workloads-dev → scales ECS service to 0. Cost Anomaly Detection (CUSTOM monitor scoped to project tag) routes spikes > $5 to the existing budget-alerts SNS. Budgets at $20/$50/$80/$100% forecast thresholds.
+EventBridge cron @ 8 PM PST → Lambda in mgmt → assumes minimal-permission `AutoStopExecutorRole` in workloads-dev → **discovers all ECS services tagged `Environment=dev` and scales each to 0**. The IAM policy is tag-conditioned (`ecs:ResourceTag/Environment = dev`) so a compromised Lambda still can't stop production. Cost Anomaly Detection routes spikes > $5 to the budget-alerts SNS topic. Budgets at $20/$50/$80/$100% forecast thresholds.
+
+### CI/CD — no static keys
+
+![CI/CD](docs/architecture-cicd.png)
+
+GitHub Actions workflows assume a federated IAM role via OIDC — no AWS access keys exist anywhere in the repo, in GitHub secrets, or on disk. The trust policy gates on `sub = repo:JadenRazo/sre-landing-zone:*` so a fork can't assume the role, and the role's inline policy includes a `aws:ResourceOrgID` condition that blocks reaching accounts outside our Organization even if the role were ever leaked.
+
+Three workflows:
+
+- **`plan.yml`** — runs on PR, detects which `infra/<phase>/` directories changed, plans each in parallel, comments the plan output back on the PR
+- **`apply.yml`** — runs on push to main, requires approval via GitHub Environment "production" before applying
+- **`nightly-teardown.yml`** — cron at 4 AM UTC (8 PM PST), destroys workloads-dev / DR / edge phases. Belt-and-suspenders alongside the in-account auto-stop Lambda.
 
 ---
 
@@ -155,7 +168,9 @@ sre-landing-zone/
 │   ├── 02-workload-dev/             # APPLIED — VPC + ALB + Fargate + Secrets + obs
 │   ├── 03-dr-pilot-light/           # APPLIED — us-east-1 standby + R53 + DDB Global
 │   ├── 04-edge-and-data/            # APPLIED — CloudFront + WAF + Cognito
-│   └── 06-cost-controls/            # APPLIED — Lambda + EventBridge + anomaly + Tag Policy
+│   ├── 06-cost-controls/            # APPLIED — Lambda + EventBridge + anomaly + Tag Policy
+│   ├── 07-cicd/                     # APPLIED — GitHub Actions OIDC role
+│   └── _backend/                    # SCAFFOLDED (not migrated) — S3 + DynamoDB remote state
 └── scripts/
     ├── preflight.sh                 # read-only env check
     └── cost-snapshot.sh             # cost-by-tag dump → docs/03 ledger
@@ -209,8 +224,9 @@ Every phase deliberately covers concepts from multiple cert blueprints:
 | 4 — Edge (CloudFront/WAF/Cognito) | ✓ | ✓✓ | ✓ | ✓✓ | Front Door + WAF + Entra External ID |
 | 5 — Write-up + 6 R's | ✓ | ✓ | ✓✓ | ✓ | (general migration concepts) |
 | 6 — Cost discipline | ✓✓ | ✓ | ✓ | | Cost Management + Functions |
+| 7 — CI/CD (OIDC, plan-on-PR, manual-approve apply) | ✓ | ✓✓ | ✓ | ✓✓ | GitHub Actions + Entra federation |
 
-Detailed Azure mappings in [docs/azure-equivalents.md](docs/azure-equivalents.md).
+Detailed Azure mappings in [docs/azure-equivalents.md](docs/azure-equivalents.md). SOC 2 / ISO 27001 / Well-Architected control mapping in [docs/06-compliance-mapping.md](docs/06-compliance-mapping.md).
 
 ---
 

@@ -12,6 +12,8 @@ from pathlib import Path
 
 from diagrams import Cluster, Diagram, Edge
 from diagrams.aws.compute import ECR, ECS, ElasticContainerServiceService, Fargate, Lambda
+from diagrams.onprem.vcs import Github
+from diagrams.onprem.ci import GithubActions
 from diagrams.aws.cost import Budgets, CostExplorer
 from diagrams.aws.database import Dynamodb
 from diagrams.aws.general import GenericSamlToken, User
@@ -358,22 +360,64 @@ def six_rs_before_after():
         b_ecs >> Edge(label="REPLATFORM\nADD: SCPs, audit trail, DR,\nedge, secrets, cost ctrls", color="darkgreen", style="bold") >> a_alb
 
 
+def cicd():
+    """Diagram 8: CI/CD pipeline — GitHub Actions OIDC → mgmt → workload accounts."""
+    with Diagram(
+        "CI/CD — GitHub Actions OIDC, no static keys",
+        show=False,
+        filename=str(OUT_DIR / "architecture-cicd"),
+        outformat="png",
+        direction="LR",
+        graph_attr=GRAPH_ATTR,
+        node_attr=NODE_ATTR,
+        edge_attr=EDGE_ATTR,
+    ):
+        dev = User("Engineer")
+
+        with Cluster("GitHub"):
+            repo = Github("sre-landing-zone\nrepo")
+            actions = GithubActions("GitHub Actions\n(plan / apply / nightly-teardown)")
+
+        with Cluster("management account"):
+            oidc = GenericSamlToken("OIDC Provider\ntoken.actions.githubusercontent.com")
+            runner_role = IAMRole("GitHubActionsTerraformRunner\nsub=repo:JadenRazo/sre-landing-zone:*")
+            sts_chain = IAMAWSSts("sts:AssumeRoleWithWebIdentity\n→ chain to member accts")
+
+        with Cluster("Workload accounts (via OrganizationAccountAccessRole)"):
+            wd = OrganizationsAccount("workloads-dev")
+            wp = OrganizationsAccount("workloads-prod")
+            la = OrganizationsAccount("log-archive")
+            audit = OrganizationsAccount("audit-security")
+
+        approval = User("Reviewer\n(GitHub Environment\n'production')")
+
+        dev >> Edge(label="git push / open PR") >> repo
+        repo >> Edge(label="trigger") >> actions
+        actions >> Edge(label="JWT, sub=repo:...", style="dashed", color="blue") >> oidc
+        oidc >> Edge(label="trust", style="dashed") >> runner_role
+        runner_role >> Edge(label="manual approve\non apply", color="orange", style="dashed") << approval
+        runner_role >> Edge(label="assume role") >> sts_chain
+        sts_chain >> [wd, wp, la, audit]
+
+
 def main():
     print("Generating architecture diagrams...")
     landing_zone()
-    print("  1/7 architecture-landing-zone.png")
+    print("  1/8 architecture-landing-zone.png")
     runtime()
-    print("  2/7 architecture-runtime.png")
+    print("  2/8 architecture-runtime.png")
     security_baseline()
-    print("  3/7 architecture-security-baseline.png")
+    print("  3/8 architecture-security-baseline.png")
     dr_pilot_light()
-    print("  4/7 architecture-dr-pilot-light.png")
+    print("  4/8 architecture-dr-pilot-light.png")
     edge_stack()
-    print("  5/7 architecture-edge.png")
+    print("  5/8 architecture-edge.png")
     cost_controls()
-    print("  6/7 architecture-cost-controls.png")
+    print("  6/8 architecture-cost-controls.png")
     six_rs_before_after()
-    print("  7/7 architecture-six-rs-before-after.png")
+    print("  7/8 architecture-six-rs-before-after.png")
+    cicd()
+    print("  8/8 architecture-cicd.png")
     print(f"\nDone. PNGs in {OUT_DIR}/")
 
 

@@ -1,0 +1,71 @@
+name: nightly teardown (cost guard)
+
+# Cron: 4 AM UTC = 8 PM PST. Belt-and-suspenders alongside the in-account
+# auto-stop Lambda from Phase 6 — the Lambda scales ECS to 0 (saves Fargate
+# cost), this destroys the NAT Gateway and ALB (saves $32+ per night).
+#
+# Phases 0, 1, 6 stay up always (security baseline, cost controls — small flat cost).
+# Phases 2, 3, 4 get destroyed nightly. Re-apply them via workflow_dispatch
+# in apply.yml when you start a study session.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC = 21:00 PDT = 20:00 PST
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you running this manually?'
+        required: false
+        type: string
+        default: 'manual cleanup'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy:
+    name: destroy ${{ matrix.phase }}
+    runs-on: ubuntu-latest
+    strategy:
+      # NOT fail-fast: if 02 fails to destroy, still try 03 and 04 — independent
+      fail-fast: false
+      max-parallel: 1   # serialize to avoid AWS throttling
+      matrix:
+        phase:
+          # Order matters: destroy edge before workload, workload before DR
+          - infra/04-edge-and-data
+          - infra/03-dr-pilot-light
+          - infra/02-workload-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.9
+
+      - name: configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+          role-session-name: gh-teardown-${{ github.run_id }}
+
+      - name: check if phase has any state to destroy
+        id: state
+        working-directory: ${{ matrix.phase }}
+        run: |
+          terraform init -input=false
+          count=$(terraform state list 2>/dev/null | wc -l)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Phase ${{ matrix.phase }}: $count resources in state"
+
+      - name: terraform destroy
+        if: steps.state.outputs.count != '0'
+        working-directory: ${{ matrix.phase }}
+        run: terraform destroy -auto-approve -input=false
+
+      - name: skip — empty state
+        if: steps.state.outputs.count == '0'
+        run: echo "No resources to destroy in ${{ matrix.phase }} — skipping."

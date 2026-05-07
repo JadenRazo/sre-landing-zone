@@ -64,30 +64,35 @@ resource "aws_iam_role" "executor" {
 
 resource "aws_iam_role_policy" "executor_ecs_scale" {
   provider = aws.workloads_dev
-  name     = "scale-ecs-service"
+  name     = "scale-ecs-services-by-tag"
   role     = aws_iam_role.executor.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
-          "ecs:UpdateService",
-          "ecs:DescribeServices",
-        ]
-        # Scoped to ONE service. Tighter than this and a Lambda crash bricks recovery.
-        Resource = "arn:aws:ecs:${var.home_region}:${local.accounts.workloads_dev}:service/${var.auto_stop_cluster_name}/${var.auto_stop_service_name}"
-      },
-      {
-        # ListClusters / ListServices have to be on resource "*" — they're
-        # account-scoped APIs, not resource-level. Read-only is acceptable.
+        # ListClusters / ListServices / DescribeServices: account-scoped APIs,
+        # can't be resource-scoped. Read-only.
         Effect = "Allow"
         Action = [
           "ecs:ListClusters",
           "ecs:ListServices",
+          "ecs:DescribeServices",
         ]
         Resource = "*"
+      },
+      {
+        # UpdateService: scoped to services in the workloads-dev account, with
+        # a tag-based condition. Even if the Lambda code is compromised, it
+        # can only scale services tagged Environment=dev.
+        Effect   = "Allow"
+        Action   = "ecs:UpdateService"
+        Resource = "arn:aws:ecs:${var.home_region}:${local.accounts.workloads_dev}:service/*/*"
+        Condition = {
+          StringEquals = {
+            "ecs:ResourceTag/Environment" = "dev"
+          }
+        }
       },
     ]
   })

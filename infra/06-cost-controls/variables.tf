@@ -16,17 +16,9 @@ variable "auto_stop_cron" {
   default     = "cron(0 4 * * ? *)"
 }
 
-variable "auto_stop_cluster_name" {
-  description = "ECS cluster the Lambda should scale to 0 (matches Phase 2)."
-  type        = string
-  default     = "sre-workloads-dev"
-}
-
-variable "auto_stop_service_name" {
-  description = "ECS service the Lambda should scale to 0 (matches Phase 2)."
-  type        = string
-  default     = "sre-reference-app"
-}
+# auto_stop_cluster_name + auto_stop_service_name removed: the Lambda now
+# discovers services by tag (Environment=dev) instead of hardcoded names.
+# Adding new dev services no longer requires a Lambda code change.
 
 variable "anomaly_threshold_usd" {
   description = "Dollar threshold above which Cost Anomaly Detection fires an alert."

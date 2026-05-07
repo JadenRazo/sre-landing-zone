@@ -1,0 +1,80 @@
+name: terraform apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/apply.yml'
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'Phase directory to apply (e.g. infra/02-workload-dev)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  detect-changed-phases:
+    name: detect changed phases
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      phases: ${{ steps.changes.outputs.phases }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: changes
+        run: |
+          changed=$(git diff --name-only HEAD^...HEAD -- infra/ \
+            | grep -oE '^infra/[^/]+/' \
+            | sort -u \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "phases=$changed" >> "$GITHUB_OUTPUT"
+
+  apply:
+    name: apply ${{ matrix.phase }}
+    needs: [detect-changed-phases]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'push' && needs.detect-changed-phases.outputs.phases != '[]' && needs.detect-changed-phases.outputs.phases != '') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    # GitHub Environment provides the manual approval gate. Configure required
+    # reviewers in repo settings → Environments → "production". Until that's
+    # configured the apply runs without a gate, which is fine for solo work
+    # but unsafe for a team.
+    environment: production
+    strategy:
+      fail-fast: true
+      matrix:
+        phase: ${{ github.event_name == 'push' && fromJSON(needs.detect-changed-phases.outputs.phases) || fromJSON(format('["{0}"]', github.event.inputs.phase)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.9
+
+      - name: configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+          role-session-name: gh-apply-${{ github.run_id }}
+
+      - name: terraform init
+        working-directory: ${{ matrix.phase }}
+        run: terraform init -input=false
+
+      - name: terraform apply
+        working-directory: ${{ matrix.phase }}
+        run: terraform apply -auto-approve -input=false
