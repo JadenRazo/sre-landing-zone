@@ -29,7 +29,7 @@ resource "aws_iam_openid_connect_provider" "github" {
 # can chain into member accounts via OrganizationAccountAccessRole.
 resource "aws_iam_role" "terraform_runner" {
   name        = "GitHubActionsTerraformRunner"
-  description = "Assumed by GitHub Actions workflows in ${var.github_org}/${var.github_repo}. Cross-account chains into OrganizationAccountAccessRole."
+  description = "Assumed by GitHub Actions workflows across the JadenRazo portfolio repos (sre-*, aws-*, azure-*, multicloud-*). Cross-account chains into OrganizationAccountAccessRole."
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -45,10 +45,10 @@ resource "aws_iam_role" "terraform_runner" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            # Scoped to ANY ref/branch/PR within OUR repo. Tighter would be
-            # "repo:JadenRazo/sre-landing-zone:ref:refs/heads/main" but that
-            # blocks PR plans. The pattern below allows PRs but blocks forks.
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:*"
+            # Multiple values are OR'd. Forks can't assume because the sub
+            # claim is always owner-scoped — `JadenRazo/repo` is set by GitHub
+            # based on the repo's owner, not by the workflow file.
+            "token.actions.githubusercontent.com:sub" = var.allowed_repo_patterns
           }
         }
       }

@@ -92,9 +92,9 @@ resource "aws_s3_bucket" "log_archive" {
   provider = aws.log_archive
   bucket   = "sre-log-archive-${local.accounts.log_archive}"
 
-  # Force-destroy off: this bucket holds compliance-grade audit trails. If you
-  # really need to delete it, override here, run, and revert.
-  force_destroy = false
+  # Force-destroy on for the teardown. Toggle back to false in production or
+  # if rebuilding the baseline as a long-lived audit posture.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_versioning" "log_archive" {
