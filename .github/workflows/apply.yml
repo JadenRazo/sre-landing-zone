@@ -1,11 +1,14 @@
 name: terraform apply
 
+# AUTO-TRIGGER ON PUSH IS DISABLED until the project migrates to S3 remote
+# state (see infra/_backend/README.md). With local state, the runner starts
+# empty each run and would try to re-create resources that already exist —
+# half-fails with "already exists" errors and leaves things in a worse state.
+#
+# Until then: trigger manually via `gh workflow run "terraform apply" --ref main \
+#   -f phase=infra/02-workload-dev` AFTER you've migrated the relevant phase.
+
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'infra/**'
-      - '.github/workflows/apply.yml'
   workflow_dispatch:
     inputs:
       phase:
@@ -18,44 +21,14 @@ permissions:
   contents: read
 
 jobs:
-  detect-changed-phases:
-    name: detect changed phases
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    outputs:
-      phases: ${{ steps.changes.outputs.phases }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: changes
-        run: |
-          changed=$(git diff --name-only HEAD^...HEAD -- infra/ \
-            | grep -oE '^infra/[^/]+/' \
-            | sort -u \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "phases=$changed" >> "$GITHUB_OUTPUT"
-
   apply:
-    name: apply ${{ matrix.phase }}
-    needs: [detect-changed-phases]
-    if: |
-      always() &&
-      (
-        (github.event_name == 'push' && needs.detect-changed-phases.outputs.phases != '[]' && needs.detect-changed-phases.outputs.phases != '') ||
-        github.event_name == 'workflow_dispatch'
-      )
+    name: apply ${{ github.event.inputs.phase }}
     runs-on: ubuntu-latest
     # GitHub Environment provides the manual approval gate. Configure required
     # reviewers in repo settings → Environments → "production". Until that's
     # configured the apply runs without a gate, which is fine for solo work
     # but unsafe for a team.
     environment: production
-    strategy:
-      fail-fast: true
-      matrix:
-        phase: ${{ github.event_name == 'push' && fromJSON(needs.detect-changed-phases.outputs.phases) || fromJSON(format('["{0}"]', github.event.inputs.phase)) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,9 +45,9 @@ jobs:
           role-session-name: gh-apply-${{ github.run_id }}
 
       - name: terraform init
-        working-directory: ${{ matrix.phase }}
+        working-directory: ${{ github.event.inputs.phase }}
         run: terraform init -input=false
 
       - name: terraform apply
-        working-directory: ${{ matrix.phase }}
+        working-directory: ${{ github.event.inputs.phase }}
         run: terraform apply -auto-approve -input=false

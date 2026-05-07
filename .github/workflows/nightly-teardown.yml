@@ -1,16 +1,14 @@
 name: nightly teardown (cost guard)
 
-# Cron: 4 AM UTC = 8 PM PST. Belt-and-suspenders alongside the in-account
-# auto-stop Lambda from Phase 6 — the Lambda scales ECS to 0 (saves Fargate
-# cost), this destroys the NAT Gateway and ALB (saves $32+ per night).
+# Belt-and-suspenders alongside the in-account auto-stop Lambda from Phase 6.
+# Lambda scales ECS to 0 (saves Fargate cost); this destroys NAT Gateway and
+# ALB (saves $32+ per night).
 #
-# Phases 0, 1, 6 stay up always (security baseline, cost controls — small flat cost).
-# Phases 2, 3, 4 get destroyed nightly. Re-apply them via workflow_dispatch
-# in apply.yml when you start a study session.
+# CRON IS DISABLED until S3 remote state is adopted (see infra/_backend/README.md).
+# With local state, the runner starts empty each run and `terraform state list`
+# returns nothing — destroy silently no-ops. Trigger manually after migrating.
 
 on:
-  schedule:
-    - cron: '0 4 * * *'   # 04:00 UTC = 21:00 PDT = 20:00 PST
   workflow_dispatch:
     inputs:
       reason:
