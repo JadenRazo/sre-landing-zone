@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source                = "hashicorp/aws"
-      version               = "~> 5.85"
+      version               = "~> 5.100"
       configuration_aliases = [aws.workloads_dev, aws.workloads_dev_useast1]
     }
   }
