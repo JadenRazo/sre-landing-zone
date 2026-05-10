@@ -44,7 +44,7 @@ jobs:
           terraform_version: 1.14.9
 
       - name: configure AWS via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-west-2
