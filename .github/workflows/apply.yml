@@ -12,7 +12,21 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: 'Phase directory to apply (e.g. infra/02-workload-dev)'
+        description: 'Exact phase directory to apply'
+        required: true
+        type: choice
+        options:
+          - infra/00-org-bootstrap
+          - infra/01-security-baseline
+          - infra/02-workload-dev
+          - infra/03-dr-pilot-light
+          - infra/04-edge-and-data
+          - infra/06-cost-controls
+          - infra/07-cicd
+          - infra/08-dns-delegation
+          - infra/_backend
+      confirmation:
+        description: 'Type the selected phase path exactly after reviewing target account and state'
         required: true
         type: string
 
@@ -22,6 +36,7 @@ permissions:
 
 jobs:
   apply:
+    if: inputs.confirmation == inputs.phase
     name: apply ${{ github.event.inputs.phase }}
     runs-on: ubuntu-latest
     # GitHub Environment provides the manual approval gate. Configure required
@@ -30,15 +45,15 @@ jobs:
     # but unsafe for a team.
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: setup terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
-          terraform_version: 1.14.9
+          terraform_version: 1.15.8
 
       - name: configure AWS via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-west-2

@@ -10,10 +10,9 @@
 #   (committed to .gitignore), and every other stack uses S3+DynamoDB.
 #
 # WHY IT'S SCAFFOLDED BUT NOT YET ADOPTED:
-#   Migrating live state from local → S3 mid-project risks corruption if any
-#   apply runs against half-migrated state. We scaffolded this for the
-#   patterns/cert-prep value but defer the actual migration to a planned
-#   maintenance window. See README for the runbook.
+#   This repository contains no verified record that every phase's local state
+#   was migrated. A current operator must inventory and back up state before a
+#   planned maintenance-window migration. See README for the runbook.
 
 provider "aws" {
   region = "us-west-2"
@@ -82,7 +81,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "tf_state" {
 # Lock table prevents concurrent applies stomping on state.
 resource "aws_dynamodb_table" "tf_lock" {
   name         = "sre-landing-zone-tflock"
-  billing_mode = "PAY_PER_REQUEST" # always-free at idle volumes
+  billing_mode = "PAY_PER_REQUEST" # avoids provisioned capacity; usage pricing still applies
   hash_key     = "LockID"
 
   attribute {
