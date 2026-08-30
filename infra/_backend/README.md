@@ -1,6 +1,6 @@
 # Remote-state backend bootstrap
 
-Creates the S3 bucket + DynamoDB lock table that every other phase will eventually use as its Terraform backend. **Currently scaffolded but not yet adopted** — see "Migration runbook" below.
+Creates the S3 bucket + DynamoDB lock table that each phase can use as its Terraform backend. **The repository has no verified evidence that migration was completed.** Inventory AWS and every local state file before following this runbook.
 
 ## Why a separate stack
 
@@ -17,16 +17,20 @@ terraform apply
 # outputs print the backend block to drop into other phases
 ```
 
-Cost: $0/month at idle (S3 holds <100 KB, DynamoDB on-demand).
+The design uses small S3 state objects and DynamoDB on-demand billing, but this document makes no current-cost or free-tier guarantee.
 
 ## Migration runbook (for existing phases)
 
 We scaffolded but **didn't migrate** the existing project's state because mid-project migration risks corruption if any apply runs against half-migrated state. To migrate when you have a planned maintenance window:
 
 ```bash
-# 1. Apply this backend stack (above)
+# 1. Inventory every local and remote state location, stop concurrent applies,
+#    and copy each local state file to an encrypted backup outside the repo.
 
-# 2. For EACH existing phase (00 through 07), run in its directory:
+# 2. Apply this backend stack only after reviewing a saved plan.
+
+# 3. For EACH existing phase (00 through 08), add the reviewed backend block,
+#    then migrate one phase at a time:
 PHASE=00-org-bootstrap   # repeat for 01, 02, 03, 04, 06, 07
 cd infra/$PHASE
 cat >> backend.tf <<EOF
@@ -43,23 +47,22 @@ EOF
 terraform init -migrate-state
 # Type 'yes' when prompted
 
-# 3. Verify
+# 4. Verify
 terraform plan
 # Expect: "No changes."
 
-# 4. Delete local state files (now redundant)
-rm terraform.tfstate*
+# 5. Keep the encrypted backup until a second operator or later session has
+#    verified the remote object, versioning, lock behavior, and no-op plan.
 ```
 
 Repeat for every phase directory. **Don't skip** the `terraform plan` verification step — if state migration corrupted anything, plan will show drift.
 
-## Why we didn't migrate today
+## Why the repository does not claim migration completion
 
-- Working applied state across 7 phases (165 resources)
-- Terraform state migration during active builds has historically corrupted state on at least 2 major incidents in our team's history
-- Honest engineering: don't break what works in pursuit of a perfect score
-
-The patterns matter (the team-readiness story); the migration itself is mechanical.
+The code alone cannot prove the current location or integrity of live state.
+Recording completion without the remote object, version history, lock test, and
+no-op plan would be false evidence. Treat the backend as a scaffold until those
+checks are captured during an authorized maintenance window.
 
 ## Cross-cert mapping
 

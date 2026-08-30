@@ -4,20 +4,25 @@ A Day-2 multi-account AWS landing zone evolved from [`sre-reference-app`](https:
 
 Built as the hands-on portfolio for **AWS SAA-C03**, also serves as conceptual prep for **CLF**, **AZ-204** (Azure equivalents documented inline), **CompTIA Cloud+**, and **ISC2 CCSP**.
 
+> **Evidence status:** the table and screenshots below record the May 2026
+> build. They are not a claim that these resources or account relationships are
+> currently deployed. Cloud-changing workflows are manual-only; current state
+> must be verified in AWS before any apply or destroy.
+
 ![Landing Zone Overview](docs/architecture-landing-zone.png)
 
 ## Status
 
-| Phase | Title | State |
+| Phase | Title | Evidence captured in May 2026 |
 |-------|-------|-------|
-| 0 | Multi-account foundation | **applied** — Org `o-9itq8iim1q`, 4 accounts, 4 SCPs |
-| 1 | Centralized security & observability | **applied** — Org CloudTrail + GuardDuty + Security Hub + 8 Config rules + Budgets |
-| 2 | Migrate sre-reference-app into workloads-dev | **applied** — VPC + NAT + ALB + ECS Fargate + Secrets Manager + dashboards/alarms |
-| 3 | DR — Pilot Light to us-east-1 | **applied** — DR ALB + ECS @ 0 + ECR replication + DynamoDB Global Table + Route 53 health checks |
-| 4 | Edge, data, and identity | **applied** — CloudFront `d27jg5do0x332j.cloudfront.net` + WAF (3 rules) + Cognito |
+| 0 | Multi-account foundation | Org `o-9itq8iim1q`, 4 member accounts, 4 SCPs |
+| 1 | Centralized security & observability | Org CloudTrail + GuardDuty + Security Hub + 8 Config rules + Budgets |
+| 2 | Migrate sre-reference-app into workloads-dev | VPC + NAT + ALB + ECS Fargate + Secrets Manager + dashboards/alarms |
+| 3 | DR — Pilot Light to us-east-1 | DR ALB + ECS @ 0 + ECR replication + DynamoDB Global Table + Route 53 health checks |
+| 4 | Edge, data, and identity | CloudFront `d27jg5do0x332j.cloudfront.net` + WAF (3 rules) + Cognito |
 | 5 | Migration write-up + visual artifacts | **complete** — 7 diagrams, 6 R's analysis, blog post, failover drill writeup |
-| 6 | Cost discipline & auto-teardown | **applied** — tag-based Lambda auto-stop + EventBridge + Cost Anomaly + Tag Policy |
-| 7 | CI/CD — GitHub Actions OIDC | **applied** — OIDC provider + runner role + plan/apply/nightly-teardown workflows |
+| 6 | Cost discipline & auto-teardown | Tag-based Lambda auto-stop + EventBridge + Cost Anomaly + Tag Policy |
+| 7 | CI/CD — GitHub Actions OIDC | OIDC provider + runner role + static/apply/teardown workflows |
 
 ---
 
@@ -59,13 +64,15 @@ EventBridge cron @ 8 PM PST → Lambda in mgmt → assumes minimal-permission `A
 
 ![CI/CD](docs/architecture-cicd.png)
 
-GitHub Actions workflows assume a federated IAM role via OIDC — no AWS access keys exist anywhere in the repo, in GitHub secrets, or on disk. The trust policy gates on `sub = repo:JadenRazo/sre-landing-zone:*` so a fork can't assume the role, and the role's inline policy includes a `aws:ResourceOrgID` condition that blocks reaching accounts outside our Organization even if the role were ever leaked.
+The write workflows are designed to assume a federated IAM role via OIDC; the repository contains no static AWS access key. The trust policy gates on `sub = repo:JadenRazo/sre-landing-zone:*`, and the role's inline policy includes an `aws:ResourceOrgID` condition to restrict access to the recorded Organization.
 
-Three workflows:
+Three workflows, with review and cloud mutation intentionally separated:
 
-- **`plan.yml`** — runs on PR, detects which `infra/<phase>/` directories changed, plans each in parallel, comments the plan output back on the PR
-- **`apply.yml`** — runs on push to main, requires approval via GitHub Environment "production" before applying
-- **`nightly-teardown.yml`** — cron at 4 AM UTC (8 PM PST), destroys workloads-dev / DR / edge phases. Belt-and-suspenders alongside the in-account auto-stop Lambda.
+- **`plan.yml`** — credential-free PR/default-branch gate: format, backendless init, and validate every phase
+- **`apply.yml`** — manual-only, fixed phase choices, typed phase confirmation, and the `production` GitHub Environment
+- **`nightly-teardown.yml`** — manual-only until remote state is adopted; typed destructive confirmation and serialized cost-bearing phases
+
+The rationale and operator preflight are in [docs/ci-safety.md](docs/ci-safety.md).
 
 ---
 
@@ -79,7 +86,7 @@ The visible lift is **Replatform** (5 components moved between accounts/regions)
 
 ## Screenshots — apply-time captures
 
-12 of 13 console captures completed during the live build. Each shows the architecture working end-to-end. The 13th (Cost Explorer by Project tag) is captured after a few days of accrued spend so the chart is meaningful — a deliberate hold.
+Twelve console captures were committed during the live build. Each is historical evidence of the recorded phase. A planned Cost Explorer capture was never added and is not claimed here.
 
 ### Multi-account foundation
 
@@ -123,17 +130,13 @@ CloudFront in front of the ALB and the WAF web ACL with 3 rules:
 ![CloudFront distribution](screenshots/11-cloudfront-distribution.png)
 ![WAF rules](screenshots/12-waf-rules.png)
 
-### Held for later
-
-`screenshots/13-cost-explorer-by-tag.png` — Cost Explorer grouped by `Project` tag. Captured after 2–3 days of post-tag-activation spend so the chart carries meaningful per-tag attribution data, not a near-empty graph.
-
 Capture playbook at [docs/screenshots-checklist.md](docs/screenshots-checklist.md).
 
 ---
 
-## Cost — actuals from the build
+## Cost — May 2026 build ledger
 
-Total run cost building this entire stack: **~$43 of the $120 budget**. Breakdown by phase in [docs/03-cost-analysis.md](docs/03-cost-analysis.md). Highest line items: NAT Gateway (~$32 if left running 24/7 — the project's biggest cost lever) and the DR ALB (~$16). Phases 0, 1, 5, 6 are nearly free.
+The project ledger recorded approximately **$43 of a $120 build budget**. See [docs/03-cost-analysis.md](docs/03-cost-analysis.md) for its dated assumptions and phase breakdown. These are historical observations, not current AWS prices or a current bill.
 
 The cost discipline that made this possible:
 
@@ -161,22 +164,27 @@ sre-landing-zone/
 │   ├── azure-equivalents.md         # AZ-204 cross-reference
 │   ├── screenshots-checklist.md     # what to capture, where, when
 │   └── architecture-*.png           # 7 generated diagrams
-├── screenshots/                     # 13 console captures (capture-time TBD)
+├── screenshots/                     # 12 historical console captures
 ├── infra/
-│   ├── 00-org-bootstrap/            # APPLIED — Org + accounts + SCPs + Identity Center
-│   ├── 01-security-baseline/        # APPLIED — CloudTrail + Config + GD + Security Hub
-│   ├── 02-workload-dev/             # APPLIED — VPC + ALB + Fargate + Secrets + obs
-│   ├── 03-dr-pilot-light/           # APPLIED — us-east-1 standby + R53 + DDB Global
-│   ├── 04-edge-and-data/            # APPLIED — CloudFront + WAF + Cognito
-│   ├── 06-cost-controls/            # APPLIED — Lambda + EventBridge + anomaly + Tag Policy
-│   ├── 07-cicd/                     # APPLIED — GitHub Actions OIDC role
-│   └── _backend/                    # SCAFFOLDED (not migrated) — S3 + DynamoDB remote state
+│   ├── 00-org-bootstrap/            # Org + accounts + SCPs + Identity Center
+│   ├── 01-security-baseline/        # CloudTrail + Config + GD + Security Hub
+│   ├── 02-workload-dev/             # VPC + ALB + Fargate + Secrets + obs
+│   ├── 03-dr-pilot-light/           # us-east-1 standby + R53 + DDB Global
+│   ├── 04-edge-and-data/            # CloudFront + WAF + Cognito
+│   ├── 06-cost-controls/            # Lambda + EventBridge + anomaly + Tag Policy
+│   ├── 07-cicd/                     # GitHub Actions OIDC role
+│   └── _backend/                    # backend scaffold; migration not evidenced
 └── scripts/
     ├── preflight.sh                 # read-only env check
     └── cost-snapshot.sh             # cost-by-tag dump → docs/03 ledger
 ```
 
 ## How to run this
+
+These commands can create paid resources and, in Phase 0, AWS accounts. First
+read [docs/ci-safety.md](docs/ci-safety.md), confirm the current account and
+state backend, review a saved plan, and obtain the intended approval. The
+examples are not an instruction to apply the full stack unattended.
 
 ```bash
 # Phase 0 — one-time, hard-to-reverse (creates 4 AWS accounts with 90-day cooldown)
@@ -224,7 +232,7 @@ Every phase deliberately covers concepts from multiple cert blueprints:
 | 4 — Edge (CloudFront/WAF/Cognito) | ✓ | ✓✓ | ✓ | ✓✓ | Front Door + WAF + Entra External ID |
 | 5 — Write-up + 6 R's | ✓ | ✓ | ✓✓ | ✓ | (general migration concepts) |
 | 6 — Cost discipline | ✓✓ | ✓ | ✓ | | Cost Management + Functions |
-| 7 — CI/CD (OIDC, plan-on-PR, manual-approve apply) | ✓ | ✓✓ | ✓ | ✓✓ | GitHub Actions + Entra federation |
+| 7 — CI/CD (OIDC writes, static PR gate, manual apply) | ✓ | ✓✓ | ✓ | ✓✓ | GitHub Actions + Entra federation |
 
 Detailed Azure mappings in [docs/azure-equivalents.md](docs/azure-equivalents.md). SOC 2 / ISO 27001 / Well-Architected control mapping in [docs/06-compliance-mapping.md](docs/06-compliance-mapping.md).
 
@@ -249,4 +257,9 @@ In order of impact (full version in [docs/05-migration-blog-post.md](docs/05-mig
 
 ---
 
-Built by [jadenrazo](https://jadenrazo.dev) — SAA-C03 prep, May 2026.
+## Security and license
+
+See [SECURITY.md](SECURITY.md) for private vulnerability reporting. Licensed
+under the [MIT License](LICENSE).
+
+Built by [Jaden Razo](https://jadenrazo.dev) — SAA-C03 portfolio build, May 2026.
