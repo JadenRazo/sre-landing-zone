@@ -1,17 +1,11 @@
 name: terraform static
 
 on:
+  # Keep this workflow unconditional so `validate` can be a required status
+  # check without blocking documentation-only pull requests as "expected".
   pull_request:
-    paths:
-      - 'infra/**'
-      - 'scripts/validate-terraform.sh'
-      - '.github/workflows/plan.yml'
   push:
     branches: [main]
-    paths:
-      - 'infra/**'
-      - 'scripts/validate-terraform.sh'
-      - '.github/workflows/plan.yml'
   workflow_dispatch:
 
 permissions:
